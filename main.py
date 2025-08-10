@@ -173,25 +173,6 @@ from collections import defaultdict
 id_to_headfoot = defaultdict(list)
 processed_ids = set()
 
-def pick_reference_person(photo_paths, image_head_foot_pairs):
-    print("\nReference Person Selection:")
-    print("Available images and detected people:")
-    for idx, (photo_path, pairs) in enumerate(zip(photo_paths, image_head_foot_pairs)):
-        print(f"[{idx}] {photo_path} - {len(pairs)} people detected")
-        for pidx, (hx, hy, fx, fy) in enumerate(pairs):
-            print(f"    Person {pidx}: Head=({hx},{hy}), Foot=({fx},{fy})")
-    ref_img_idx = int(input("\nEnter the image index for the reference person: ").strip())
-    ref_person_idx = int(input("Enter the person index in that image: ").strip())
-    H_real = float(input("Enter the real-world height of this person in meters (e.g., 1.70): ").strip())
-    ref_photo = photo_paths[ref_img_idx]
-    ref_pair = image_head_foot_pairs[ref_img_idx][ref_person_idx]
-    print(f"\nReference person selected:")
-    print(f"Image: {ref_photo}")
-    print(f"Person index: {ref_person_idx}")
-    print(f"2D Head position: ({ref_pair[0]}, {ref_pair[1]})")
-    print(f"2D Foot position: ({ref_pair[2]}, {ref_pair[3]})")
-    print(f"Real-world height (H_real): {H_real} meters")
-    return ref_img_idx, ref_person_idx, H_real, ref_pair
 
 if input_type == 'video':
     video_path = input("Enter the path to the video file: ").strip()
@@ -303,23 +284,12 @@ elif input_type == 'photo':
                 lines.append((A/norm, B/norm, C/norm))
                 
         print(f"Number of valid lines in image {idx}: {len(lines)}")
-        # Use adaptive threshold based on image size
-        best_vp = None
-        max_inliers = 0
-        selected_frame = cv2.imread(photo_path)
-        if selected_frame is None:
-            continue
-        h, w = selected_frame.shape[:2]
         
-        threshold = 0.01 * np.sqrt(w*w + h*h)  # Adaptive threshold
-        print(f"Adaptive threshold for image {idx}: {threshold:.2f} pixels") 
-        print(f"Image dimensions: {w}x{h} pixels")
-        iterations = 100000 
-        '''# Step 3: Applying RANSAC to find the vertical vanishing point for THIS IMAGE
+        # Step 3: Applying RANSAC to find the vertical vanishing point for THIS IMAGE
         best_vp = None
         max_inliers = 0
         threshold = 5  # pixel distance threshold
-        iterations = 100000'''
+        iterations = 100000
         
         # Store the VVP when it's computed during vertical vanishing point estimation
         if len(lines) >= 2:
@@ -355,10 +325,10 @@ elif input_type == 'photo':
                 image_vvp = best_vp  # Store VVP for this specific image
                 
                 # Visualization for THIS IMAGE
-                #selected_frame = cv2.imread(photo_path)
-                #if selected_frame is None:
+                selected_frame = cv2.imread(photo_path)
+                if selected_frame is None:
                 
-                    #continue
+                    continue
                     
                 vis_img = selected_frame.copy()
                 
@@ -392,97 +362,7 @@ elif input_type == 'photo':
             print(f"Image {idx} - Not enough lines for vanishing point estimation")
     
     
-    '''def adaptive_vvp_detection(lines, iterations=50000):
-        """Adaptive threshold VVP detection"""
-        print("🔍 Starting adaptive VVP detection...")
-    
-        # Calculate image-based thresholds
-        image_diagonal = np.sqrt(selected_frame.shape[0]**2 + selected_frame.shape[1]**2)
-        base_threshold = image_diagonal * 0.01  # 1% of diagonal
-    
-        # Test multiple thresholds
-        thresholds = [
-            base_threshold * 0.5,   # Very strict
-            base_threshold * 1.0,   # Moderate
-            base_threshold * 2.0,   # Relaxed
-            base_threshold * 3.0,   # Very relaxed
-            base_threshold * 5.0    # Ultra relaxed
-        ]
-    
-        best_result = None
-        best_score = -1
-    
-        for threshold in thresholds:
-            print(f"  Testing threshold: {threshold:.1f}px")
-        
-            # Run RANSAC with this threshold
-            best_vp = None
-            max_inliers = 0
-        
-            for _ in range(iterations):
-                if len(lines) < 2:
-                    break
-                
-                # Randomly select 2 lines
-                idx1, idx2 = np.random.choice(len(lines), 2, replace=False)
-                l1, l2 = lines[idx1], lines[idx2]
-            
-                # Compute intersection
-                d = l1[0]*l2[1] - l2[0]*l1[1]
-                if abs(d) < 1e-6:
-                    continue
-                
-                x = (l1[1]*l2[2] - l2[1]*l1[2]) / d
-                y = (l2[0]*l1[2] - l1[0]*l2[2]) / d
-            
-                # Count inliers
-                inliers = sum(1 for A, B, C in lines if abs(A*x + B*y + C) < threshold)
-            
-                if inliers > max_inliers:
-                    max_inliers = inliers
-                    best_vp = (int(round(x)), int(round(y)))
-        
-                if best_vp and max_inliers > 0:
-                    
-                    # Calculate quality score
-                    inlier_ratio = max_inliers / len(lines)
-            
-                # Penalize extreme coordinates
-                coord_penalty = 0
-                if abs(best_vp[0]) > selected_frame.shape[1] * 2:
-                    coord_penalty += 0.1
-                if abs(best_vp[1]) > selected_frame.shape[0] * 5:
-                    coord_penalty += 0.1
-                
-                score = inlier_ratio - coord_penalty
-            
-                print(f"    Found VVP: {best_vp}, Inliers: {max_inliers}/{len(lines)}, Score: {score:.3f}")
-            
-                if score > best_score:
-                    
-                    best_score = score
-                    best_result = {
-                        'vvp': best_vp,
-                        'threshold': threshold,
-                        'inliers': max_inliers,
-                        'score': score
-                    }
-    
-        if best_result:
-            
-           print(f"✓ Best VVP: {best_result['vvp']} (threshold: {best_result['threshold']:.1f}, score: {best_result['score']:.3f})")
-        return best_result['vvp'], best_result
-                
 
-    # Replace your current VVP detection code with:
-    best_vp, vvp_details = adaptive_vvp_detection(lines)
-    if best_vp:
-        #
-        image_vvp = best_vp
-        max_inliers = vvp_details['inliers']
-    else:
-        #
-        image_vvp = None'''
 
             
     # --- Horizontal Vanishing Point Estimation (Head-to-Head and Foot-to-Foot) ---
@@ -1159,63 +1039,7 @@ elif input_type == 'photo':
         R_validated = validation_results['R']
         P_validated = validation_results['P']
     
-
-
-
-
-
-    '''# Add this right before your f3D computation
-    def diagnose_projection_matrix(K, R, t, P):
-        print("\n=== PROJECTION MATRIX DIAGNOSIS ===")
-        # Check K matrix
-        print("Intrinsic Matrix K:")
-        print(K)
-        print(f"Focal length: {K[0,0]:.2f}")
-        print(f"Principal point: ({K[0,2]:.1f}, {K[1,2]:.1f})")
-    
-        # Check R matrix thoroughly
-        print(f"\nRotation Matrix R:")
-        print(R)
-        print(f"R determinant: {np.linalg.det(R):.6f} (should be ≈ 1.0)")
-        print(f"R condition number: {np.linalg.cond(R):.2e}")
-    
-        # Check if R is orthonormal
-        RTR = R.T @ R
-        is_orthonormal = np.allclose(RTR, np.eye(3), atol=1e-4)
-        print(f"R^T R ≈ I: {is_orthonormal}")
-        if not is_orthonormal:
-            
-            print("R^T R:")
-            print(RTR)
-    
-        # Check column norms of R
-        col_norms = [np.linalg.norm(R[:, i]) for i in range(3)]
-        print(f"R column norms: {col_norms} (should all be ≈ 1.0)")
-    
-        # Check translation vector
-        print(f"\nTranslation vector t:")
-        print(t.flatten())
-        print(f"Translation magnitude: {np.linalg.norm(t):.3f}")
-    
-        # Check P construction
-        P_reconstructed = K @ np.hstack([R, t.reshape(-1, 1)])
-        print(f"\nP matrix construction check:")
-        print(f"P (given):")
-        print(P)
-        print(f"K[R|t] (reconstructed):")
-        print(P_reconstructed)
-    
-    # Check P condition number
-        print(f"\nP condition number: {np.linalg.cond(P):.2e}")
-        PTP = P.T @ P
-        print(f"P^T P condition number: {np.linalg.cond(PTP):.2e}")
-    
-        return P_reconstructed
-    final_P = diagnose_projection_matrix(K, R, t, P)
-    print(f"\nFinal Projection Matrix P:")
-    print(final_P) '''
-       
-    # Add after reference person selection:
+   # visualizition function for referance person
 
     def visualize_reference_person(image, head_pos, foot_pos, H_real):
         
@@ -1296,73 +1120,9 @@ elif input_type == 'photo':
         return vis_img
 
     
-    '''# --- Reference Person Selection from Separate Photo ---
-    ref_photo_path = input("Enter the path to the reference photo (for reference person): ").strip()
-    ref_selected_frame = cv2.imread(ref_photo_path)
-    if ref_selected_frame is None:
-        print(f"Could not read the reference image: {ref_photo_path}")
-        exit()
-    ref_results = model(ref_selected_frame)
-    ref_pairs = []
-    for r in ref_results:
-        for i, box in enumerate(r.boxes):
-            if model.names[int(box.cls)] == 'person':
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cropped_person = ref_selected_frame[y1:y2, x1:x2]
-                cropped_pil = Image.fromarray(cv2.cvtColor(cropped_person, cv2.COLOR_BGR2RGB))
-                transform = transforms.Compose([
-                    transforms.ToTensor(),
-                ])
-                img_tensor = transform(cropped_pil).unsqueeze(0)
-                with torch.no_grad():
-                    prediction = maskrcnn(img_tensor)[0]
-                person_indices = [j for j, label in enumerate(prediction['labels']) if label == 1]
-                if person_indices:
-                    mask = prediction['masks'][person_indices[0], 0].cpu().numpy()
-                    binary_mask = (mask > 0.5).astype(np.uint8)
-                    ys, xs = np.where(binary_mask == 1)
-                    if len(ys) > 0:
-                        h2D_y = ys.min()
-                        h2D_x = xs[ys.argmin()]
-                        f2D_y = ys.max()
-                        f2D_x = xs[ys.argmax()]
-                        h2D = (h2D_x + x1, h2D_y + y1)
-                        f2D = (f2D_x + x1, f2D_y + y1)
-                        print(f"Reference photo, Person {i}: Head 2D position: {h2D}, Foot 2D position: {f2D}")
-                        ref_pairs.append((h2D[0], h2D[1], f2D[0], f2D[1]))
-    ref_img_idx = 0
-    if len(ref_pairs) == 0:
-        print("No persons detected in the reference photo.")
-        exit()
-    for pidx, (hx, hy, fx, fy) in enumerate(ref_pairs):
-        print(f"    Person {pidx}: Head=({hx},{hy}), Foot=({fx},{fy})")
-        
-    vis_img = visualize_detected_persons(ref_selected_frame, ref_pairs, "Reference Photo - Select Person")
-    cv2.imwrite('reference_persons_detected.png', vis_img)
-    ref_person_idx = int(input("Enter the person index in the reference photo: ").strip())
-    H_real = float(input("Enter the real-world height of this person in meters (e.g., 1.70): ").strip())
-    ref_pair = ref_pairs[ref_person_idx]
-    print(f"\nReference person selected:")
-    print(f"Image: {ref_photo_path}")
-    print(f"Person index: {ref_person_idx}")
-    print(f"2D Head position: ({ref_pair[0]}, {ref_pair[1]})")
-    print(f"2D Foot position: ({ref_pair[2]}, {ref_pair[3]})")
-    print(f"Real-world height (H_real): {H_real} meters")
-    # Visualize selected reference person
-    head_pos = (ref_pair[0], ref_pair[1])
-    foot_pos = (ref_pair[2], ref_pair[3])
-    ref_vis = visualize_reference_person(ref_selected_frame, head_pos, foot_pos, H_real)
-    print("Reference person visualization saved as 'reference_person.png'")'''
-    
-    
-    '''# Add after reference person selection:
-    head_pos = (ref_pair[0], ref_pair[1])
-    foot_pos = (ref_pair[2], ref_pair[3])
-    ref_vis = visualize_reference_person(ref_selected_frame, head_pos, foot_pos, H_real)
-    print("Reference person visualization saved as 'reference_person.png'")  '''
-      
-    # Replace the Reference Person Selection section with:
 
+      
+    
     # --- Reference Person Selection from Separate Photo ---
     print("\n--- Reference Person Selection ---")
     ref_photo_path = input("Enter the path to the reference photo: ").strip()
@@ -1416,8 +1176,8 @@ elif input_type == 'photo':
     print("Reference person visualization saved as 'reference_person.png'")
 
 
-# Add this after the reference person selection code and before the height estimation
 
+####--- WE ARE TAKKING TARGET PERSON FROM ONE OF THE INPUT IMAGES ---####
 # Select a foot point from input images
     print("\n--- Select a foot point from input images ---")
     print("Available input images:")
@@ -1544,7 +1304,7 @@ elif input_type == 'photo':
             return None, False
         
         
-        # Add this after f3D ray intersection validation:
+        # FUNCTION FOR VISUALIZE THE PROJECTED F3D TO 2D:
     def visualize_reprojection(image, original_point, reprojected_point, margin_w, title="Reprojection Visualization"):
         
         """Visualize original and reprojected points"""
@@ -1553,13 +1313,7 @@ elif input_type == 'photo':
         vis_img = np.zeros((h, w + 2 * margin_w, 3), dtype=np.uint8)
         vis_img[:, margin_w:margin_w+w] = image  # Place original image in center
     
-        '''# Draw original point (red)
-        cv2.circle(vis_img, 
-              (int(original_point[0] + margin_w), int(original_point[1])), 
-              8, (0, 0, 255), -1)
-        cv2.putText(vis_img, 'Original',     
-                (int(original_point[0] + margin_w + 10), int(original_point[1])), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)'''
+        
         
         # Draw original point (red), shifted into extended canvas
         orig_x_ext = int(round(original_point[0] + margin_w))
@@ -1567,21 +1321,7 @@ elif input_type == 'photo':
         cv2.circle(vis_img, (orig_x_ext, orig_y_ext), 8, (0, 0, 255), -1)
         cv2.putText(vis_img, 'Original', (orig_x_ext + 10, orig_y_ext), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         
-        '''# Draw reprojected point (green)
-        cv2.circle(vis_img, 
-              (int(reprojected_point[0]), int(reprojected_point[1])), 
-              8, (0, 255, 0), -1)
-        cv2.putText(vis_img, 'Reprojected', 
-                (int(reprojected_point[0] + 10), int(reprojected_point[1])), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                
-        
-    
-    #     Draw line between points
-        cv2.line(vis_img, 
-            (int(original_point[0] + margin_w), int(original_point[1])),
-            (int(reprojected_point[0]), int(reprojected_point[1])),
-            (255, 255, 0), 2)'''
+
             
         # Draw reprojected point (green), already in extended canvas coordinates
         reproj_x_ext = int(round(reprojected_point[0]))
@@ -1593,16 +1333,7 @@ elif input_type == 'photo':
         cv2.line(vis_img, (orig_x_ext, orig_y_ext), (reproj_x_ext, reproj_y_ext), (255, 255, 0), 2)
 
     
-        '''# Show error distance
-        error = np.linalg.norm(np.array([reprojected_point[0] - margin_w, reprojected_point[1]]) - 
-                          np.array(original_point))
-        cv2.putText(vis_img, f'Error: {error:.1f}px', 
-                (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    
-        cv2.imshow(title, vis_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        return vis_img'''
+
         reproj_original = np.array([reprojected_point[0] - margin_w, reprojected_point[1]])
         error = np.linalg.norm(reproj_original - np.array(original_point))
         cv2.putText(vis_img, f'Error: {error:.1f}px', (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -1662,7 +1393,7 @@ elif input_type == 'photo':
     
 
 
-    # Add after selecting reference person's foot point:
+    #Computing reference 3D person's foot point:
 
     def compute_ref_3D_footpoint(K, R, t, ref_foot_2d, debug=True):
         """
