@@ -769,7 +769,7 @@ elif input_type == 'photo':
         
         
         
-    
+    ##-- FUNCTIONS FOR VALIDATION OF PARAMETERS OF P MATRIX ---#
     def validate_focal_length(f, image_width, image_height):
         
         """Validate if the computed focal length is reasonable"""
@@ -1086,7 +1086,7 @@ elif input_type == 'photo':
         cv2.imwrite('reference_person.png', vis_img)
         return vis_img
     
-    # Add this function after process_image function:
+    
     def visualize_detected_persons(image, pairs, title="Detected Persons"):
         """Visualize all detected persons with their IDs"""
         vis_img = image.copy()
