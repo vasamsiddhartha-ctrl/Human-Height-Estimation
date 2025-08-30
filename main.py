@@ -26,7 +26,7 @@ except Exception as e:
 
 def process_image(frame):
     """Process a single image with YOLOv8-Pose and Mask R-CNN"""
-    results = []
+    Results = []
     debug_frame = frame.copy()
     
     # Run YOLOv8-Pose with lower confidence threshold
@@ -86,17 +86,17 @@ def process_image(frame):
                 print(f"Invalid crop for person {i}")
                 continue
             
-            # Convert to PIL and prepare for Mask R-CNN
+            # Convert to the PIL and prepare for the Mask R-CNN
             cropped_pil = Image.fromarray(cv2.cvtColor(cropped_person, cv2.COLOR_BGR2RGB))
             transform = transforms.Compose([transforms.ToTensor()])
             img_tensor = transform(cropped_pil).unsqueeze(0)
             
             try:
-                # Run Mask R-CNN with error handling
+                # Running Mask R-CNN with error handling
                 with torch.no_grad():
                     prediction = maskrcnn(img_tensor)[0]
                 
-                # Get person mask with confidence threshold
+                # Getting person mask with confidence threshold
                 person_indices = [j for j, (label, score) in enumerate(zip(prediction['labels'], prediction['scores'])) 
                                 if label == 1 and score > 0.7]
                 
@@ -115,46 +115,46 @@ def process_image(frame):
                 debug_frame[y1:y2, x1:x2] = cv2.addWeighted(
                     debug_frame[y1:y2, x1:x2], 1, mask_display, 0.3, 0)
                 
-                # Define search regions
+                # Define the search regions
                 bbox_height = y2 - y1
-                head_region_height = int(bbox_height * 0.15)  # Increased from 0.05
-                foot_region_height = int(bbox_height * 0.15)  # Increased from 0.10
+                Head_region_height = int(bbox_height * 0.15)  # Increased from 0.05
+                Foot_region_height = int(bbox_height * 0.15)  # Increased from 0.10
                 
-                # Find head point
-                head_region = binary_mask[:head_region_height, :]
-                head_y_local = None
-                if head_region.any():
-                    head_ys, head_xs = np.where(head_region == 1)
+                # Finding the head point
+                Head_region = binary_mask[:Head_region_height, :]
+                Head_y_local = None
+                if Head_region.any():
+                    Head_ys, Head_xs = np.where(Head_region == 1)
                     if len(head_ys) > 0:
-                        head_y_local = head_ys.min()
-                        head_x_local = head_xs[head_ys.argmin()]
-                        head_point = (head_x_local + x1, head_y_local + y1)
+                        Head_y_local = Head_ys.min()
+                        Head_x_local = Head_xs[head_ys.argmin()]
+                        Head_point = (Head_x_local + x1, Head_y_local + y1)
                         cv2.circle(debug_frame, head_point, 5, (0, 255, 0), -1)
                 
-                # Find foot point
-                foot_region = binary_mask[-foot_region_height:, :]
-                foot_y_local = None
-                if foot_region.any():
-                    foot_ys, foot_xs = np.where(foot_region == 1)
+                # Finding the foot point
+                Foot_region = binary_mask[-Foot_region_height:, :]
+                Foot_y_local = None
+                if Foot_region.any():
+                    Foot_ys, Foot_xs = np.where(Foot_region == 1)
                     if len(foot_ys) > 0:
-                        foot_y_local = foot_ys.max() + (binary_mask.shape[0] - foot_region.shape[0])
-                        foot_x_local = foot_xs[foot_ys.argmax()]
-                        foot_point = (foot_x_local + x1, foot_y_local + y1)
-                        cv2.circle(debug_frame, foot_point, 5, (0, 0, 255), -1)
+                        Foot_y_local = Foot_ys.max() + (binary_mask.shape[0] - Foot_region.shape[0])
+                        Foot_x_local = Foot_xs[Foot_ys.argmax()]
+                        Foot_point = (Foot_x_local + x1, Foot_y_local + y1)
+                        cv2.circle(debug_frame, Foot_point, 5, (0, 0, 255), -1)
                 
-                if head_y_local is not None and foot_y_local is not None:
+                if Head_y_local is not None and Foot_y_local is not None:
                     # Draw head-foot line
-                    cv2.line(debug_frame, head_point, foot_point, (255, 0, 0), 2)
+                    cv2.line(debug_frame, Head_point, Foot_point, (255, 0, 0), 2)
                     
-                    results.append({
-                        'head': head_point,
-                        'foot': foot_point,
+                    Results.append({
+                        'Head': Head_point,
+                        'Foot': Foot_point,
                         'bbox': (x1, y1, x2, y2),
-                        'height_pixels': foot_point[1] - head_point[1]
+                        'height_pixels': Foot_point[1] - Head_point[1]
                     })
                     
                     # Add height text
-                    height_pixels = foot_point[1] - head_point[1]
+                    height_pixels = Foot_point[1] - Head_point[1]
                     cv2.putText(debug_frame, f'Height: {height_pixels}px', 
                               (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
                 
@@ -162,10 +162,10 @@ def process_image(frame):
                 print(f"Error processing mask for person {i}: {e}")
                 continue
     
-    if not results:
+    if not Results:
         print("No valid detections found in the image")
     
-    return debug_frame, results
+    return debug_frame, Results
 
 input_type = input("Enter input type ('video' or 'photo'): ").strip().lower()
 
@@ -626,10 +626,12 @@ elif input_type == 'photo':
         # 1. Express vanishing points in homogeneous coordinates
         v1 = np.array([left_hvp[0], left_hvp[1], 1], dtype=np.float64)    # Left HVP
         v2 = np.array([right_hvp[0], right_hvp[1], 1], dtype=np.float64)  # Right HVP
-        v3 = np.array([image_vvp[0], image_vvp[1], 1], dtype=np.float64)  # Vertical VP'''
+        v3 = np.array([image_vvp[0], image_vvp[1], 1], dtype=np.float64)  # Vertical VP
+        
         '''v1 = np.array([left_hvp_original[0], left_hvp_original[1], 1], dtype=np.float64)    # Left HVP
         v2 = np.array([right_hvp_original[0], right_hvp_original[1], 1], dtype=np.float64)  # Right HVP
         v3 = np.array([image_vvp[0], image_vvp[1], 1], dtype=np.float64)  # Vertical VP (already in original coords)'''
+        
         # Normalize vanishing points before cross product
         v1 = v1 / np.linalg.norm(v1)
         v2 = v2 / np.linalg.norm(v2)
